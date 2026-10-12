@@ -1,0 +1,17 @@
+{
+  "name": "G COLONY",
+  "short_name": "G COLONY",
+  "description": "家屋侵略シミュレーション ＋ 魔王城建国記 ゴキ鉄",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d0906",
+  "theme_color": "#0d0906",
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
