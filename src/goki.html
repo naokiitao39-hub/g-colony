@@ -1721,6 +1721,20 @@ const halle=(tr,u)=>({tr,unit:()=>u,voices:[
   {w:'pulse50',v:.05,s:seq('D4+F#4+A4:2 D4+F#4+A4:1 D4+G4+B4:1 D4+F#4+A4:2 r:2 D4+F#4+A4:2 D4+F#4+A4:1 D4+G4+B4:1 D4+F#4+A4:2 r:2 D4+F#4+A4:4 D4+F#4+A4:4 D4+G4+B4:4 C#4+E4+A4:4 D4+F#4+A4:2 D4+F#4+A4:1 D4+G4+B4:1 D4+F#4+A4:2 r:2 C#4+E4+A4:2 C#4+E4+A4:1 D4+F#4+A4:1 C#4+E4+A4:2 r:2 D4+F#4+A4:4 C#4+E4+A4:4 D4+F#4+A4:6 r:2')},
   {w:'triangle',v:.22,s:seq('D3:2 D3:1 G2:1 D3:2 r:2 D3:2 D3:1 G2:1 D3:2 r:2 D3:4 D3:4 G2:4 A2:4 D3:2 D3:1 G2:1 D3:2 r:2 A2:2 A2:1 D3:1 A2:2 r:2 D3:4 A2:4 D3:6 r:2')}]});
 TRK.halle=halle(0,.25);TRK.gyo=halle(-3,.3);TRK.ending=halle(0,.3);
+{ // 建国のハレルヤ：合唱（ソプラノ・アルト/テノール・バス）＋弦＋ティンパニ＋鐘
+  const H=halle(0,.3),mel=H.voices[0].s,chd=H.voices[1].s,bas=H.voices[2].s,len=mel.reduce((a,e)=>a+e.d,0),bars=len/8;
+  const low=sq=>sq.map(e=>({n:e.n.map(m=>m-12),d:e.d}));
+  const timp=seq(Array.from({length:bars},(_,k)=>k===bars-1?'D2:1 D2:1 D2:1 D2:1 D2:4':k%4===3?'A1:2 A1:2 D2:4':'D2:2 r:2 A1:2 r:2').join(' '));
+  const bell=seq(Array.from({length:bars},(_,k)=>k%4===1?'r:4 D6:2 A5:2':k===bars-1?'D6:2 F#6:2 A6:4':'r:8').join(' '));
+  TRK.ending={unit:()=>.31,echo:1,voices:[
+    {w:'choir',soft:1,v:.095,s:mel},
+    {w:'choir',soft:1,v:.05,s:chd},
+    {w:'choir',soft:1,v:.07,s:bas.map(e=>({n:e.n.map(m=>m+12),d:e.d}))},
+    {w:'strings',soft:1,v:.045,s:low(chd)},
+    {w:'sine',soft:1,v:.14,s:bas},
+    {w:'timp',inst:1,v:.36,s:timp},
+    {w:'bell',soft:1,v:.045,s:bell}]};
+}
 { // メニュー：王道RPG風のオリジナル行進曲
   const C='C3:2 G3:2 C3:2 G3:2',F='F2:2 C3:2 F2:2 C3:2',Gc='G2:2 D3:2 G2:2 D3:2',CG='C3:2 G3:2 G2:2 D3:2';
   TRK.menu={unit:()=>.19,voices:[
@@ -1763,16 +1777,26 @@ function osc(t,f,dur,w,vol,dest,slide){
   o.connect(g);g.connect(dest);o.start(t);o.stop(t+dur+.05);
 }
 function soft(t,f,dur,w,vol,dest){
+  if(w==='choir'||w==='strings'){ // 合唱（アー）／弦：少しずつずらしたノコギリ波を重ねて、やわらかく削る
+    const c=AU.ctx,g=c.createGain(),lp=c.createBiquadFilter(),lfo=c.createOscillator(),lg=c.createGain(),ch=w==='choir';
+    lp.type='lowpass';lp.frequency.value=Math.min(ch?2800:1600,f*(ch?4.5:3));lp.Q.value=.6;lfo.frequency.value=ch?5.2:4.6;lg.gain.value=f*(ch?.007:.004);lfo.connect(lg);
+    const os=(ch?[-11,-3,4,12]:[-7,7]).map(dc=>{const o=c.createOscillator();o.type='sawtooth';o.frequency.value=f;o.detune.value=dc;lg.connect(o.frequency);o.connect(lp);return o;});
+    let out=lp;if(ch){const f1=c.createBiquadFilter();f1.type='peaking';f1.frequency.value=800;f1.Q.value=1.4;f1.gain.value=7;const f2=c.createBiquadFilter();f2.type='peaking';f2.frequency.value=1150;f2.Q.value=2;f2.gain.value=4;lp.connect(f1);f1.connect(f2);out=f2;}
+    out.connect(g);g.connect(dest);const at=ch?.09:.28,rel=ch?.45:.8;
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+at);g.gain.setValueAtTime(vol,Math.max(t+at+.01,t+dur-.04));g.gain.linearRampToValueAtTime(0,t+dur+rel);
+    [...os,lfo].forEach(o=>{o.start(t);o.stop(t+dur+rel+.05);});return;}
   const c=AU.ctx,o=c.createOscillator(),o2=c.createOscillator(),g=c.createGain();o.type=w==='bell'?'sine':w;o2.type='sine';o.frequency.value=f;o2.frequency.value=w==='bell'?f*2:f*1.003;
   const rel=Math.max(.35,dur*.6);g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+(w==='bell'?.008:.05));g.gain.exponentialRampToValueAtTime(vol*.35,t+dur);g.gain.exponentialRampToValueAtTime(.0005,t+dur+rel);
   const g2=c.createGain();g2.gain.value=w==='bell'?.25:.4;o.connect(g);o2.connect(g2);g2.connect(g);g.connect(dest);o.start(t);o2.start(t);o.stop(t+dur+rel+.05);o2.stop(t+dur+rel+.05);
 }
-const DRUM={kick:1,snare:1,hat:1,ohat:1};
+const DRUM={kick:1,snare:1,hat:1,ohat:1};const PITCHED_DRUM={timp:1};
 function inst(t,f,dur,w,vol,dest){
   const c=AU.ctx,g=c.createGain();g.connect(dest);
   if(w==='kick'){const o=c.createOscillator();o.type='sine';o.frequency.setValueAtTime(160,t);o.frequency.exponentialRampToValueAtTime(42,t+.13);g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.001,t+.24);o.connect(g);o.start(t);o.stop(t+.26);return;}
   if(w==='snare'){noise(t,.15,vol*.9,g,1900,'bandpass');const o=c.createOscillator();o.type='triangle';o.frequency.setValueAtTime(210,t);o.frequency.exponentialRampToValueAtTime(140,t+.08);g.gain.value=1;
     const g2=c.createGain();g2.gain.setValueAtTime(vol*.6,t);g2.gain.exponentialRampToValueAtTime(.001,t+.1);o.connect(g2);g2.connect(dest);o.start(t);o.stop(t+.12);return;}
+  if(w==='timp'){const o=c.createOscillator();o.type='sine';o.frequency.setValueAtTime(f*1.04,t);o.frequency.exponentialRampToValueAtTime(f,t+.12);g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.001,t+1.3);o.connect(g);o.start(t);o.stop(t+1.35);
+    const g2=c.createGain();g2.gain.value=1;g2.connect(dest);noise(t,.12,vol*.5,g2,300,'lowpass');return;}
   if(w==='hat'||w==='ohat'){g.gain.value=1;noise(t,w==='ohat'?.16:.035,vol,g,7500,'highpass');return;}
   const end=t+dur;
   if(w==='lead'){ // ブラス風のリード
@@ -1828,7 +1852,7 @@ function schedule(){
       const ev=vs.v.s[vs.i++],dur=ev.d*S.unit;
       if(vs.next>=now-.02&&ev.n.length){
         if(vs.v.w==='noise')noise(vs.next,.05,vs.v.v,S.g);
-        else if(vs.v.inst){if(DRUM[vs.v.w])inst(vs.next,0,dur,vs.v.w,vs.v.v,S.g);else ev.n.forEach(m=>inst(vs.next,hz(m+(S.T.tr||0)),dur*(vs.v.gate||.9),vs.v.w,vs.v.v/Math.sqrt(ev.n.length),S.g));}
+        else if(vs.v.inst){if(DRUM[vs.v.w]&&!PITCHED_DRUM[vs.v.w])inst(vs.next,0,dur,vs.v.w,vs.v.v,S.g);else ev.n.forEach(m=>inst(vs.next,hz(m+(S.T.tr||0)),dur*(vs.v.gate||.9),vs.v.w,vs.v.v/Math.sqrt(ev.n.length),S.g));}
         else if(vs.v.soft)ev.n.forEach(m=>soft(vs.next,hz(m+(S.T.tr||0)),dur*.95,vs.v.w,vs.v.v/Math.sqrt(ev.n.length),S.g));
         else ev.n.forEach(m=>osc(vs.next,hz(m+(S.T.tr||0)),dur*.95,vs.v.w,vs.v.v/Math.sqrt(ev.n.length),S.g));
       }
