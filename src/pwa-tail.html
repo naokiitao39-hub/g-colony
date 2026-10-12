@@ -1,0 +1,7 @@
+
+<script>
+// ホーム画面アプリ用：一度開けば電波がなくても遊べるようにする
+if('serviceWorker' in navigator&&location.protocol!=='file:'){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));}
+</script>
+</body>
+</html>
