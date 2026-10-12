@@ -318,18 +318,18 @@ const ROOMS=[
   {f:1,n:'寝室1',r:[1,1,8,12],c:'#493846'},
   {f:1,n:'寝室2',r:[10,1,16,12],c:'#3d4850'},
   {f:1,n:'寝室3',r:[18,1,24,12],c:'#4a4334'},
-  {f:1,n:'2F廊下',r:[1,14,18,18],c:'#4c3828'},
+  {f:1,n:'2F廊下',r:[1,14,18,20],c:'#4c3828'},
   {f:0,n:'トイレ',r:[17,14,19,16],c:'#3d4b48'},
   {f:0,n:'洗面所',r:[17,18,19,20],c:'#45545a'},
-  {f:1,n:'納戸',r:[20,14,24,18],c:'#3f3328'},
+  {f:1,n:'納戸',r:[20,14,24,20],c:'#3f3328'},
 ];
-const DOORS=[[0,16,6],[0,12,13],[0,4,13],[0,8,17],[0,16,15],[0,16,19],[0,20,19],[0,4,21],[1,4,13],[1,13,13],[1,18,13],[1,19,16]];
+const DOORS=[[0,16,6],[0,15,13],[0,4,13],[0,8,17],[0,16,15],[0,16,19],[0,20,19],[0,4,21],[1,4,13],[1,13,13],[1,18,13],[1,19,16]];
 const grid=[0,1].map(()=>Array.from({length:H},()=>new Array(W).fill(WALL)));
 ROOMS.forEach((rm,i)=>{const[a,b,c,d]=rm.r;for(let y=b;y<=d;y++)for(let x=a;x<=c;x++)grid[rm.f][y][x]=i;});
 DOORS.forEach(([f,x,y])=>grid[f][y][x]=DOOR);
 const pass=(f,x,y)=>x>=0&&y>=0&&x<W&&y<H&&grid[f][y][x]!==WALL;
 const roomAt=(f,x,y)=>{const X=Math.floor(x),Y=Math.floor(y);if(X<0||Y<0||X>=W||Y>=H)return WALL;return grid[f][Y][X];};
-const STAIRS=[{f:0,r:[13,18,15,20],tx:14,ty:19},{f:1,r:[13,16,15,18],tx:14,ty:17}];
+const STAIRS=[{f:0,r:[13,18,15,20],tx:14,ty:19},{f:1,r:[13,18,15,20],tx:14,ty:19}];
 const inStairs=(f,x,y)=>{const s=STAIRS[f].r;return x>=s[0]&&x<s[2]+1&&y>=s[1]&&y<s[3]+1;};
 // [階, 名前, x, y, w, h, 巣の名前, 色]
 const FURN=[
@@ -345,7 +345,7 @@ const FURN=[
   [0,'点検口',23,11,1,1,'畳の下','#3a3826'],
   [0,'下駄箱',1,14,2,4,'下駄箱','#7b5a3a'],
   [0,'傘立て',6,19,1,1,'傘立て裏','#4c6070'],
-  [0,'収納',9,19,2,2,'階段下収納','#6a4c32'],
+  [0,'収納',11,19,2,2,'階段下収納','#6a4c32'],
   [0,'洗濯機',17,19,2,2,'洗濯機裏','#d6d8da'],
   [0,'給湯器',24,14,1,2,'給湯器配管','#9a9c9e'],
   [0,'浴槽',21,17,4,4,null,'#a9c4cc'],
@@ -364,6 +364,7 @@ const FURN=[
   // ここから下は後から追加（じゅもんの互換のため末尾に足す）
   [0,'便器',18,14,2,2,'便器の裏','#e6eaec'],
   [0,'棚',17,16,3,1,'トイレ収納','#7a6a55'],
+  [0,'洗面台',17,18,3,1,null,'#cfd8dc'],
 ];
 const SPOTS=[];
 FURN.forEach(fu=>{if(fu[6])SPOTS.push({id:SPOTS.length,f:fu[0],x:fu[2]+fu[4]/2,y:fu[3]+fu[5]/2,rx:fu[2],ry:fu[3],w:fu[4],h:fu[5],name:fu[6]});});
@@ -1698,7 +1699,7 @@ function start(data){
   }else{newGame();show('ovTitle');}
   requestAnimationFrame(frame);
 }
-window.__GC={encodePW,applySave,makeKey,readKey,decodePW,reachClear,allMax,updateGokiBtn,storeKey,KANA,get G(){return G},get mode(){return mode},set mode(v){mode=v}};
+window.__GC={bfs,ROOMS,SPOTS,FURN,grid,STAIRS,get P(){return P},encodePW,applySave,makeKey,readKey,decodePW,reachClear,allMax,updateGokiBtn,storeKey,KANA,get G(){return G},get mode(){return mode},set mode(v){mode=v}};
 window.claude?.hot?.ready?window.claude.hot.ready(start):start(window.claude?.hot?.data??{});
 })();
 </script>
