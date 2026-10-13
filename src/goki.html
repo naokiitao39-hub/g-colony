@@ -49,6 +49,7 @@ body{background:var(--sea2);color:var(--ink);font-family:var(--body);font-weight
 #destBar .lbl{flex:none;align-self:center;font-family:var(--pop);font-size:13px;color:#fff;text-shadow:0 2px 0 var(--ink),0 0 4px var(--ink)}
 .dest{flex:none;font-family:var(--pop);font-size:13px;padding:7px 12px;border-radius:999px;border:2.5px solid var(--ink);background:var(--cream);color:var(--ink);display:flex;align-items:center;gap:6px;box-shadow:0 3px 0 var(--ink)}
 .dest i{width:12px;height:12px;border-radius:4px;display:inline-block;border:2px solid var(--ink)}
+.dest.survey{background:#fff3c4}.dest.survey.on{background:#ffd23f}
 .dest small{font-family:var(--body);font-weight:700;color:var(--dim);font-size:11px}
 .dest.best{background:#fff3b8}
 #dice{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);z-index:5;display:flex;gap:10px;pointer-events:none}
@@ -114,6 +115,7 @@ textarea.pw{width:100%;max-width:380px;min-height:130px;resize:none;background:v
 .prow .pd{grid-column:1;line-height:1.5;font-size:11.5px;font-weight:700;color:var(--dim);font-variant-numeric:tabular-nums}
 .prow button{grid-row:1/3;grid-column:2;font-family:var(--pop);font-size:13.5px;padding:8px 10px;border-radius:999px;border:2.5px solid var(--ink);background:var(--yellow);color:var(--ink);min-width:88px;box-shadow:0 3px 0 var(--ink)}
 .prow button.take{background:#ff8a7a}
+.stnHead{font-family:var(--pop);font-size:15px;margin:12px 4px 4px;color:var(--ink);cursor:pointer}.stnHead small{font-size:12px;color:var(--dim)}
 .debt{background:#fff1ee;border:2.5px solid var(--ink);border-radius:14px;padding:10px 12px;font-weight:700;font-size:13.5px;line-height:1.6}.debt small{color:var(--dim)}.neg{color:#d8352a}
 .prow button:disabled{background:#eee;color:#999;box-shadow:none}
 .tbl{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums;font-weight:700}
@@ -924,10 +926,10 @@ async function landOn(p){
 }
 async function arriveGoal(p){
   // 到着ボーナス：3匹の総資産の合計の15%（序盤の最低保証あり）。だれが取っても大きく動くので、最後までもつれる
-  const d=distFrom(G.prevGoal)[p.node],pool=G.players.reduce((a,q)=>a+Math.max(0,assets(q)),0),rank=G.players.filter(q=>assets(q)>assets(p)).length,pct=[.10,.15,.20][rank],rw=Math.round(Math.max((2500+d*170)*yfac(),pool*pct)/50)*50;
+  const d=distFrom(G.prevGoal)[p.node],pool=G.players.filter(q=>q.money>=0).reduce((a,q)=>a+Math.max(0,assets(q)),0),rank=G.players.filter(q=>assets(q)>assets(p)).length,pct=[.10,.15,.20][rank],rw=pool>0?Math.round(Math.max((2500+d*170)*yfac(),pool*pct)/50)*50:5000;
   p.money+=rw;p.goals++;fy(p.id).oin+=rw;fy(p.id).goal++;updateHUD();
   await goalMovie(p,G.goal,rw);
-  await say(`${p.name}が目的地「${STN[G.goal].name}」に一番乗り！\n魔王城から援助の兵力${fmtM(rw)}がとどいた！\n（3匹の総資産の合計の${Math.round(pct*100)}%：${rank+1}位ボーナス）`);
+  await say(`${p.name}が目的地「${STN[G.goal].name}」に一番乗り！\n魔王城から援助の兵力${fmtM(rw)}がとどいた！\n${pool>0?`（マイナスでない者の総資産の${Math.round(pct*100)}%：${rank+1}位ボーナス）`:'（全員マイナスのため固定額）'}`);
   const old=G.goal;G.prevGoal=old;G.goal=newGoal(old);
   // いちばん遠い者に駆除業者が取りつく
   const others=G.players.filter(q=>q!==p),far=others.map(q=>({q,d:distFrom(old)[q.node]})).sort((a,b)=>b.d-a.d||assets(b.q)-assets(a.q))[0].q;
@@ -982,7 +984,7 @@ async function useCard(p,idx){
     case 'raid':{const mine=ownedBy(top.id).filter(i=>!safeProp(i));if(!mine.length){await say(`しかし${top.name}には奪える物件がなかった。`);return {};}
       const i=mine.sort((a,b)=>PROPS[b].price-PROPS[a].price)[0];setOwn(i,p.id);SFX.slash();await say(`夜襲成功！ ${top.name}の「${STN[PROPS[i].st].name}・${PROPS[i].name}」を奪った！`);return {};}
     case 'poison':for(const q of rivals){q.money=Math.round(q.money*.8);}SFX.bad();await say(`ライバルたちは毒餌を食べた！ 兵力が2割へった。`);return {};
-    case 'sticky':{let tg=top;if(isYou(p))tg=await say('どちらを足止めする？',{btns:rivals.map(q=>[q.name,q])});tg.skip=1;await say(`${tg.name}は粘着シートにはりついた！ 次のばんは動けない。`);return {};}
+    case 'sticky':{let tg=top;if(tg&&tg.skip===3)tg=null;if(isYou(p))tg=await say('どちらを足止めする？',{btns:rivals.map(q=>[q.name,q])});if(!tg||tg.skip===3){await say('しかし相手は強制労働中だった。');return {};}tg.skip=1;await say(`${tg.name}は粘着シートにはりついた！ 次のばんは動けない。`);return {};}
     case 'split':{if(!p.cards.length){await say('しかし分裂させるカードがなかった。');return {};}if(p.cards.length>=8){await say('カードがいっぱいで分裂できなかった。');return {};}const cc=pick(p.cards);p.cards.push(cc);await say(`「${CARDS[cc].n}」が分裂してふえた！`);return {};}
     case 'guard':p.cards.splice(idx,0,id);await say('このカードは持っているだけで効果があります。');return {};
   }
@@ -1040,6 +1042,7 @@ async function humanPhase(){
       const gi=p.cards.indexOf(5);if(gi>=0){p.cards.splice(gi,1);r.card=true;continue;}
       while(n--&&mine.length){const k=ri(0,mine.length-1),i=mine.splice(k,1)[0];if(await castleGuard(i,true)){r.kept++;continue;}setOwn(i,0);r.lost.push(PROPS[i].name);}}
     cur=null;updateHUD();await cleanMovie(res);}
+  for(const p of G.players)if(p.money<0)await settleDebt(p,'兵力がマイナスです');
   updateHUD();
 }
 async function monthEvent(){
@@ -1406,10 +1409,43 @@ function cleanMovie(res){
 const sellValue=i=>Math.round(PROPS[i].price*(1+INV[G.lv[i]])*.6/10)*10;
 function cpuSellOrder(id){ // 収益の悪いもの・城を崩さないものから売る
   return ownedBy(id).sort((a,b)=>{const f=i=>propInc(i)/sellValue(i)*(monoOwner(PROPS[i].st)===id?2.2:1);return f(a)-f(b);});}
+/* 強制労働：売る物件もなく兵力がマイナスなら、網走の強制労働所へ。1回休みのあと、マイナスでない全員の総資産の15%が報酬として入る */
+const laborPay=p=>{const pool=G.players.filter(q=>q!==p&&q.money>=0).reduce((a,q)=>a+Math.max(0,assets(q)),0);return Math.max(5000,Math.round(pool*.15/10)*10);};
+async function forcedLabor(p){
+  if(p.skip===3)return;p.skip=3;const camp=STN.find(s=>s.name==='網走')||STN[0];
+  if(!TEST){SFX.bad();await laborMovie(p);await teleport(p,camp.i);await say(`${p.name}は売る物件もなく、兵力がマイナス${fmtM(-p.money)}。\n網走の強制労働所へ送られた！ 次のばんは働きづめで動けない。`,{auto:!isYou(p)});}
+  else p.node=camp.i;}
+async function laborTurn(p){
+  p.skip=0;const pay=laborPay(p);p.money+=pay;fy(p.id).oin+=pay;
+  if(!TEST){SFX.coin();await say(`${p.name}は網走で1か月の強制労働を終えた。\n労働の報酬 兵力+${fmtM(pay)}（マイナスでない全員の総資産の15%）`);}
+  await settleDebt(p,'強制労働のあとも兵力がマイナス');}
+function laborMovie(p){
+  const rocks=Array.from({length:14},(_,k)=>({x:30+k*28,y:520+(k%3)*24}));
+  return fxRun((c,cw,ch,t)=>{c.fillStyle='#1d1f24';c.fillRect(0,0,cw,ch);vbox(c,cw,ch,400,760);
+    const sky=c.createLinearGradient(0,0,0,460);sky.addColorStop(0,'#2a2f3a');sky.addColorStop(1,'#59606e');c.fillStyle=sky;c.fillRect(-400,0,1200,460);
+    c.fillStyle='#4a4038';c.fillRect(-400,460,1200,320);
+    // 鉄条網の柵
+    c.strokeStyle='#888';c.lineWidth=3;for(let x=-20;x<440;x+=60){c.beginPath();c.moveTo(x,300);c.lineTo(x,460);c.stroke();}
+    c.lineWidth=1.5;for(const y of[320,350,380]){c.beginPath();for(let x=-20;x<440;x+=10)c.lineTo(x,y+Math.sin(x*.5)*3);c.stroke();}
+    outlined(c,'網走 強制労働所',200,250,22,'#ddd',INK,5);
+    for(const r of rocks){c.fillStyle='#7a6f62';c.strokeStyle=INK;c.lineWidth=2;c.beginPath();c.ellipse(r.x,r.y,14,9,0,0,7);c.fill();c.stroke();}
+    // つるはしを振るう
+    const sw=Math.sin(t*6);c.save();c.filter='grayscale(.6)';drawPiece(c,p.id,200,560,46,t);c.restore();
+    c.save();c.translate(240,520);c.rotate(-.8+sw*.7);c.strokeStyle='#6a4a2a';c.lineWidth=6;c.beginPath();c.moveTo(0,0);c.lineTo(0,-60);c.stroke();c.strokeStyle='#bbb';c.lineWidth=7;c.beginPath();c.moveTo(-26,-56);c.quadraticCurveTo(0,-70,26,-56);c.stroke();c.restore();
+    if(Math.floor(t*3)!==Math.floor((t-.017)*3))SFX.hit();
+    c.fillStyle='#fff';c.strokeStyle=INK;c.lineWidth=3;rrect(c,30,40,340,110,16);c.fill();c.stroke();
+    outlined(c,'強制労働！',200,80,32,'#d8352a',INK,6);c.fillStyle=INK;c.font=`14px ${FONT_POP}`;c.textAlign='center';c.textBaseline='middle';
+    c.fillText(`${p.name}　1回休み → 報酬 ${fmtM(laborPay(p))}`,200,124);
+  },2.2,6);
+}
 async function settleDebt(p,reason){
   if(p.money>=0)return;
-  if(!ownedBy(p.id).length){if(!TEST)await say(`${p.name}の兵力はマイナス${fmtM(-p.money)}。物件の収益で取り返すしかない……`,{auto:!isYou(p)});return;}
-  if(isYou(p)&&!G.auto&&!TEST){await sellPanel(p,reason);return;}
+  if(ownedBy(p.id).length){
+    if(isYou(p)&&!G.auto&&!TEST)await sellPanel(p,reason);
+    else{const sold=[];for(const i of cpuSellOrder(p.id)){if(p.money>=0)break;p.money+=sellValue(i);fy(p.id).loss-=sellValue(i);setOwn(i,0);sold.push(PROPS[i].name);}
+      if(sold.length&&!TEST)await say(`兵力が足りない！ ${p.name}は物件を売り払った。\n（${sold.slice(0,4).join('、')}${sold.length>4?` ほか${sold.length-4}件`:''}）`,{auto:!isYou(p)});}}
+  if(p.money<0&&!ownedBy(p.id).length)await forcedLabor(p);
+  updateHUD();return;
   const sold=[];for(const i of cpuSellOrder(p.id)){if(p.money>=0)break;p.money+=sellValue(i);fy(p.id).loss-=sellValue(i);setOwn(i,0);sold.push(PROPS[i].name);}
   if(sold.length&&!TEST)await say(`兵力が足りない！ ${p.name}は物件を売り払った。\n（${sold.slice(0,4).join('、')}${sold.length>4?` ほか${sold.length-4}件`:''}）`,{auto:!isYou(p)});
 }
@@ -1431,15 +1467,17 @@ function sellPanel(p,reason){
 const HOME={1:'魔王城本殿',2:'ネズミ大王の地下宮殿',3:'シロアリ女帝の女王の間'};
 const RAIDV=['侍の一団が斬り込んできた','駆除部隊が煙霧を流し込んだ','バスターズが吸引装置を持ち込んだ','猫の大群が暴れ回った'];
 let raidedYear={};
-async function homeRaid(){
+async function homeRaid(){ // 人類の総攻撃：3匹の本拠地がいっせいに襲われ、それぞれ修繕費を請求される（1年に1回まで）
   if(G.month===4)raidedYear={};
-  const cand=G.players.filter(p=>!raidedYear[p.id]&&ownedBy(p.id).length>=3);if(!cand.length)return;
-  if(Math.random()>=Math.min(.17,.06+.012*G.year))return;
-  const w=cand.map(p=>Math.pow(Math.max(1,assets(p)),1.6)),tot=w.reduce((a,b)=>a+b,0);let r=Math.random()*tot,p=cand[0];for(let k=0;k<cand.length;k++){r-=w[k];if(r<=0){p=cand[k];break;}}
-  raidedYear[p.id]=1;
-  const cash=Math.max(0,p.money),pv=propValue(p.id),short=Math.max(400*yfac(),pv*rand(.04,.09)),need=Math.round((Math.min(cash,pv*.3)+short)/10)*10,cr=ri(0,3);
-  if(!TEST){cur=null;updateHUD();if(isYou(p))await raidMovie(p,need,cr);else{SFX.siren();await say(`緊急事態！ ${HOME[p.id]}に人類が攻めこんだ！\n${RAIDV[cr]}……${p.name}に修繕費${fmtM(need)}の請求！`,{auto:true});}}
-  p.money-=need;fy(p.id).repair+=need;await settleDebt(p,`${HOME[p.id]}の修繕費 ${fmtM(need)}`);updateHUD();
+  if(raidedYear.all||!G.players.some(p=>ownedBy(p.id).length>=3))return;
+  if(Math.random()>=Math.min(.13,.05+.008*G.year))return;
+  raidedYear.all=1;const cr=ri(0,3);
+  const bills=G.players.map(p=>{const cash=Math.max(0,p.money),pv=propValue(p.id),short=Math.max(400*yfac(),pv*rand(.04,.09));return {p,need:Math.round((Math.min(cash,pv*.3)+short)/10)*10};});
+  if(!TEST){cur=null;updateHUD();const me=bills.find(b=>isYou(b.p));if(me)await raidMovie(me.p,me.need,cr);else SFX.siren();
+    await say(`緊急事態！ 人類が3匹の本拠地にいっせいに攻めこんだ！\n${RAIDV[cr]}……\n${bills.map(b=>`${b.p.name} 修繕費${fmtM(b.need)}`).join('　')}`,{auto:!me});}
+  for(const b of bills){b.p.money-=b.need;fy(b.p.id).repair+=b.need;}
+  for(const b of bills)if(b.p.money<0)await settleDebt(b.p,`${HOME[b.p.id]}の修繕費 ${fmtM(b.need)}`);
+  updateHUD();
 }
 function raidMovie(p,need,cr){
   const sparks=Array.from({length:50},()=>({x:Math.random()*400,y:200+Math.random()*300,v:30+Math.random()*80,s:2+Math.random()*3}));let cue=0;
@@ -1499,11 +1537,11 @@ function gyoCutin(p,type,mega,how){
 const HOWTO=[
  ['ゴール','期間が終わったとき、<b>総資産（兵力＋物件の価値）</b>がいちばん多い者が日本を手にする。'],
  ['サイコロで進む','1〜6マス進む。<span class="t b">＋</span>青マスは兵力アップ、<span class="t r">－</span>赤マスは兵力ダウン、<span class="t y">？</span>黄マスはカード。急行・特急・新幹線カードでサイコロを2〜4個ふれる。'],
- ['目的地に一番乗り','目的地の駅に一番に着くと、魔王城から<b>3匹の総資産の合計の10〜20%</b>もの援助がもらえる（1位10%・2位15%・3位20%）。逆転の一番のチャンス。サイコロの目ぴったりで止まったときだけ到着（通りすぎてもダメ）。'],
+ ['目的地に一番乗り','目的地の駅に一番に着くと、魔王城から<b>兵力がマイナスでない者の総資産の合計の10〜20%</b>もの援助がもらえる（1位10%・2位15%・3位20%。全員マイナスなら5000万）。逆転の一番のチャンス。サイコロの目ぴったりで止まったときだけ到着（通りすぎてもダメ）。行き先を選ぶときは<b>🔍調査</b>で、駅の物件の値段やマスの中身を確かめられる。'],
  ['駅で物件を侵略','止まった駅の物件を兵力で手に入れる。<b>持っている物件の利益は毎ターン少しずつ入り、毎年3月の決算でどーんと入る</b>。駅の物件を全部そろえると<b>独占</b>で収益2倍、ライバルに奪われなくなる。ライバルの物件は倍額で奪える。'],
- ['物件を強化','自分の物件がある駅に止まると「強化」できる。★1で収益1.7倍、★2で2.6倍、★3で4倍。持ち主が変わると★は消える。'],
+ ['物件を強化','下の<b>「物件」</b>ボタンで自分の物件の一覧が見られ、自分のばんのサイコロ前なら<b>どこからでも強化</b>できる（新しく侵略できるのは止まった駅だけ）。★1で収益1.7倍、★2で2.6倍、★3で4倍。持ち主が変わると★は消える。'],
  ['城を守る','独占した駅は<b>城</b>になる。城は人類の攻撃を50%以上の確率ではね返し、撃退ボーナスももらえる。毎年3月の<b>決算</b>では城の価値の10%がボーナスで入る。物件を<b>全部★3にするとMAXの城</b>：金色に輝き、守り85%、決算ボーナス20%、ライバルの夜襲でも奪えない。壊せるのは人類だけ。'],
- ['兵力が足りないとき','赤マスや<b>本拠地への襲撃</b>（修繕費の請求）で兵力がマイナスになると、物件を売って穴埋めする。売値は価値の6割なので売るほど損。資産が多い者ほど本拠地が狙われやすい。'],
+ ['兵力が足りないとき','赤マスや<b>本拠地への襲撃</b>（人類が3匹の本拠地をいっせいに襲い、修繕費を請求）で兵力がマイナスになると、物件一覧から売る物件を選んで穴埋めする。売値は価値の6割なので売るほど損。<b>売る物件もないと網走の強制労働所</b>へ送られ1回休み。そのかわり、マイナスでない全員の総資産の15%が労働の報酬として入る。'],
  ['人類と駆除業者','毎月、人類が物件を取り返しに来る。12月は年末大掃除。目的地から一番遠い者には<b>駆除業者</b>が取りつき、毎ターン悪さをする。だれかとすれちがえば押しつけられる。'],
 ];
 function howtoPanel(){
@@ -1575,7 +1613,9 @@ function setBar(on){$('#bDice').disabled=!on;$('#bCard').disabled=!on;}
 async function turn(p){
   cur=p;updateHUD();focusNode(p.node);if(p.id===1)autosave();
   {const inc=monthly(p.id);if(inc>0){p.money+=inc;fy(p.id).rev+=inc;addPops(p);SFX.coin();toast(`${p.name}の物件から兵力 +${fmtM(inc)}`,p.id===1?'good':'');updateHUD();await wait(isYou(p)?700:350);}}
+  if(p.skip===3){await laborTurn(p);updateHUD();return;}
   if(p.skip>0){p.skip--;await say(`${p.name}は粘着シートにくっついて動けない！`);return;}
+  if(p.money<0)await settleDebt(p,'兵力がマイナスです');
   let dice=1;
   if(isYou(p)){
     SFX.turn();
@@ -1596,24 +1636,57 @@ async function turn(p){
   await moveAlong(p,ch.path);updateHUD();
   await landOn(p);updateHUD();
   await gyoAct(p);updateHUD();await flushCastle();
+  if(p.money<0)await settleDebt(p,'兵力がマイナスです');
 }
 let destPick=null;
+function squareInfo(p,node){ // 調査：青・赤・？マスの中身
+  const N=NODES[node],sea=season(),y=G.year;
+  const blue=Math.max(500+300*y,Math.max(0,p.money)*.04)*(sea==='夏'?2:1),cold=sea==='冬'&&(N.rg==='北'||N.rg==='東'),red=Math.max(420+260*y,Math.max(0,p.money)*.045)*(sea==='冬'?(cold?3:2):1);
+  const [t,txt]=N.t==='b'?['青マス',`エサが見つかり、兵力がふえる。<br>めやす <b>+${fmtM(Math.round(blue*.6/10)*10)}〜${fmtM(Math.round(blue*1.4/10)*10)}</b>${sea==='夏'?'<br>（夏は2倍）':''}`]
+    :N.t==='r'?['赤マス',`殺虫剤をあびて、兵力がへる。<br>めやす <b>−${fmtM(Math.round(red*.6/10)*10)}〜${fmtM(Math.round(red*1.4/10)*10)}</b>${cold?'<br>（北国の冬は3倍）':sea==='冬'?'<br>（冬は2倍）':''}`]
+    :['？マス（黄）',`カードが1枚手に入る。<br>手持ち <b>${p.cards.length}/8枚</b>${p.cards.length>=8?'<br><b style="color:#d8352a">満杯なので拾えません</b>':''}`];
+  return openPanel(t,`あと${stepsTo(node,G.goal)}マスで目的地`,(body,foot,close)=>{body.innerHTML=`<div class="debt" style="background:#fffaf0;font-size:14px;line-height:1.7">${txt}</div>`;footBtn(foot,'とじる',()=>{SFX.cursor();close();});});
+}
+function yesNo(title,msg,yes='止まる',no='やめる'){
+  return openPanel(title,'',(body,foot,close)=>{body.innerHTML=`<div class="debt" style="font-size:14px;line-height:1.7">${msg}</div>`;
+    footBtn(foot,no,()=>{SFX.cursor();close(false);},'big ghost small');footBtn(foot,yes,()=>{SFX.ok();close(true);});});
+}
 function pickDest(p,opts,n){
   return new Promise(res=>{
     const sorted=opts.slice().sort((a,b)=>stepsTo(a.node,G.goal)-stepsTo(b.node,G.goal));
     hl=sorted.map((o,k)=>({...o,best:k===0}));
-    const bar=$('#destBar');bar.hidden=false;bar.innerHTML=`<span class="lbl">${n}マス　行き先は？</span>`;
-    const lab=o=>{const N=NODES[o.node];if(N.t==='s')return [STN[N.st].name+'駅','#f1e4d0'];return [{b:'青マス',r:'赤マス',y:'黄マス'}[N.t],{b:'#3d82d9',r:'#d9483d',y:'#e8c33a'}[N.t]];};
-    sorted.forEach((o,k)=>{const[t,c]=lab(o),d=stepsTo(o.node,G.goal),b=document.createElement('button');b.className='dest'+(k===0?' best':'');
-      b.innerHTML=`<i style="background:${c}"></i>${t}<small style="color:var(--dim)">あと${d}</small>`;b.onclick=()=>done(o);b.onpointerenter=()=>focusNode(o.node);bar.appendChild(b);});
-    const done=o=>{SFX.ok();destPick=null;hl=[];bar.hidden=true;res(o);};
-    destPick=done;cam.tz=Math.min(cam.tz,.75);
+    const bar=$('#destBar');bar.hidden=false;let survey=false,busy=false;
+    const lab=o=>{const N=NODES[o.node];if(N.t==='s')return [STN[N.st].name+'駅','#f1e4d0'];return [{b:'青マス',r:'赤マス',y:'？マス'}[N.t],{b:'#3d82d9',r:'#d9483d',y:'#e8c33a'}[N.t]];};
+    const render=()=>{bar.innerHTML=`<span class="lbl">${survey?'調べたい行き先をタップ':`${n}マス　行き先は？`}</span>`;
+      const sv=document.createElement('button');sv.className='dest survey'+(survey?' on':'');sv.innerHTML=survey?'調査をやめる':'🔍 調査';sv.onclick=()=>{SFX.cursor();survey=!survey;render();};bar.appendChild(sv);
+      sorted.forEach((o,k)=>{const[t,c]=lab(o),d=stepsTo(o.node,G.goal),b=document.createElement('button');b.className='dest'+(k===0?' best':'');
+        b.innerHTML=`<i style="background:${c}"></i>${t}<small style="color:var(--dim)">あと${d}</small>`;b.onclick=()=>tap(o);b.onpointerenter=()=>focusNode(o.node);bar.appendChild(b);});};
+    const tap=async o=>{if(busy||busyPanel)return;busy=true;try{
+      const N=NODES[o.node];
+      if(survey){SFX.cursor();focusNode(o.node);if(N.t==='s')await showStation(N.st,false);else await squareInfo(p,o.node);return;}
+      if(N.t==='y'&&p.cards.length>=8&&!G.auto){SFX.cursor();focusNode(o.node);
+        if(!await yesNo('カードが満杯です',`カードは<b>8/8枚</b>で満杯です。<br>？マスに止まっても、カードは拾えません。<br><br>それでも止まりますか？`))return;}
+      SFX.ok();destPick=null;hl=[];bar.hidden=true;res(o);}finally{busy=false;}};
+    render();destPick=tap;cam.tz=Math.min(cam.tz,.75);
   });
 }
 $('#bDice').onclick=()=>{if(actionResolve){SFX.ok();actionResolve('dice');}};
 $('#bCard').onclick=()=>{if(actionResolve){SFX.cursor();actionResolve('card');}};
-$('#bStation').onclick=()=>{if(!G||busyPanel)return;SFX.cursor();const N=NODES[G.players[0].node];
-  if(N.t==='s')showStation(N.st,false);else{const near=STN.slice().sort((a,b)=>distFrom(a.i)[G.players[0].node]-distFrom(b.i)[G.players[0].node])[0];showStation(near.i,false);}};
+$('#bStation').onclick=()=>{if(!G||busyPanel)return;SFX.cursor();myPropsPanel();};
+function myPropsPanel(){
+  const p=G.players[0],canUp=!!actionResolve&&isYou(p); // 自分のばんの行動前だけ強化できる
+  return openPanel('わたしの物件',`兵力 ${fmtM(p.money)}`,(body,foot,close)=>{
+    const draw=()=>{body.innerHTML='';const mine=ownedBy(1);
+      const sum=document.createElement('div');sum.className='debt';sum.style.background='#fffaf0';
+      sum.innerHTML=mine.length?`物件 <b>${mine.length}</b>件　城 <b>${monoCount(1)}</b>　毎ターン <b>+${fmtM(monthly(1))}</b>　決算 <b>+${fmtM(income(1)*KESSAN_SHARE)}</b><br><small>${canUp?'強化はどこからでもできます（新しい物件の侵略は、その駅に止まったときだけ）。':'強化できるのは、自分のばんでサイコロを振る前です。'}</small>`:'まだ物件がありません。駅に止まって侵略しよう。';
+      body.appendChild(sum);
+      const byStn=new Map();for(const i of mine){const st=PROPS[i].st;if(!byStn.has(st))byStn.set(st,[]);byStn.get(st).push(i);}
+      const order=[...byStn.keys()].sort((a,b)=>byStn.get(b).reduce((x,i)=>x+propInc(i),0)-byStn.get(a).reduce((x,i)=>x+propInc(i),0));
+      for(const st of order){const h=document.createElement('div');h.className='stnHead';const mo=monoOwner(st)===1;
+        h.innerHTML=`${STN[st].name}駅 <small>${byStn.get(st).length}/${STN[st].props.length}件${mo?(isFort(st)?'・MAXの城':'・城'):''}</small>`;h.onclick=()=>{close();focusNode(STN[st].i);cam.tz=Math.max(cam.tz,1);};body.appendChild(h);
+        for(const i of byStn.get(st))body.appendChild(propRow(i,p,canUp,()=>{},async i2=>{await doUpgrade(p,i2);toast(`${PROPS[i2].name}を強化！ ${stars(G.lv[i2])}`,'good');updateHUD();$('#pSub').textContent=`兵力 ${fmtM(p.money)}`;draw();}));}};
+    draw();footBtn(foot,'とじる',()=>{SFX.cursor();close();});});
+}
 $('#bRank').onclick=()=>{if(!G||busyPanel)return;SFX.cursor();rankPanel();};
 $('#bMenu').onclick=()=>{if(!G||busyPanel)return;SFX.cursor();menuPanel();};
 function rankPanel(){
@@ -2241,6 +2314,6 @@ function titleArt(){const c=$('#titleArt');if(!c||!c.getContext)return;const g2=
 document.addEventListener('click',e=>{const b=e.target.closest('button');if(b&&!b.disabled&&(b.classList.contains('sndToggle')))setMute(!AU.muted);},true);
 function loop(){try{render();}catch(e){console.error(e);}requestAnimationFrame(loop);}
 if(!TEST){requestAnimationFrame(loop);titleArt();if(sharedCtx())audioInit();playTrack('menu');}
-window.__GT={badEndMovie,rollDice,diceHTML,FACE_ROT,setCur:x=>{cur=x},victoryMovie,demoEnding,settlement,fy,viewScale,raidMovie,sellPanel,homeRaid,kessanMovie,cleanMovie,AU,playTrack:n=>playTrack(n),setOwn,flushCastle,castleQ,castleSprite,cam,LAND,inLand,nearRail,toW,DECO,WAVES,CASTLE,cam,goalMovie,gyoCutin,howtoPanel,showStation,get G(){return G},set G(v){G=v},newState,gameLoop,encodePW,decodePW,applyPW,NODES,STN,PROPS,EDGES,reach,assets,ownedBy,monoCount,income,setCur:p=>cur=p};
+window.__GT={squareInfo,yesNo,pickDest,myPropsPanel,forcedLabor,laborTurn,laborPay,settleDebt,badEndMovie,rollDice,diceHTML,FACE_ROT,setCur:x=>{cur=x},victoryMovie,demoEnding,settlement,fy,viewScale,raidMovie,sellPanel,homeRaid,kessanMovie,cleanMovie,AU,playTrack:n=>playTrack(n),setOwn,flushCastle,castleQ,castleSprite,cam,LAND,inLand,nearRail,toW,DECO,WAVES,CASTLE,cam,goalMovie,gyoCutin,howtoPanel,showStation,get G(){return G},set G(v){G=v},newState,gameLoop,encodePW,decodePW,applyPW,NODES,STN,PROPS,EDGES,reach,assets,ownedBy,monoCount,income,setCur:p=>cur=p};
 })();
 </script>
